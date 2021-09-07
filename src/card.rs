@@ -26,7 +26,7 @@ pub enum QueryExtraType {
 
 impl std::fmt::Display for QueryExtraType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        stringify!(self).to_lowercase().fmt(f)
+        write!(f, "{}", format!("{:?}", self).to_lowercase())
     }
 }
 
@@ -68,7 +68,10 @@ pub async fn fetch_idol_cards_with_opt<T: Into<i32> + std::string::ToString>(
         .await?;
 
     if resp.status() != StatusCode::OK {
-        bail!("Response status code was not 200 OK")
+        bail!(format!(
+            "Response status code was not 200 OK(URL: {})",
+            resp.url()
+        ))
     }
     let b = resp.bytes().await?;
 
@@ -76,12 +79,12 @@ pub async fn fetch_idol_cards_with_opt<T: Into<i32> + std::string::ToString>(
 }
 
 pub enum CardType {
-    FrameNoAwakend,     // 覚醒前・枠有り
-    NoFrameNoAwakend,   // 覚醒前・枠無し
-    FrameAwakened,      // 覚醒後・枠有り
-    NoFrameAwakened,    // 覚醒後・枠無し
-    BgNoFrameNoAwakend, // BG・枠無し
-    BgNoFrameAwakened,  // BG・枠有り
+    FrameNoAwakend,      // 覚醒前・枠有り
+    NoFrameNoAwakened,   // 覚醒前・枠無し
+    FrameAwakened,       // 覚醒後・枠有り
+    NoFrameAwakened,     // 覚醒後・枠無し
+    BgNoFrameNoAwakened, // BG・枠無し
+    BgNoFrameAwakened,   // BG・枠有り
 }
 
 impl CardType {
@@ -90,8 +93,8 @@ impl CardType {
             CardType::FrameAwakened => "_0_a",
             CardType::FrameNoAwakend => "_0_b",
             CardType::NoFrameAwakened => "_1_a",
-            CardType::NoFrameNoAwakend => "_1_b",
-            CardType::BgNoFrameNoAwakend => "_0",
+            CardType::NoFrameNoAwakened => "_1_b",
+            CardType::BgNoFrameNoAwakened => "_0",
             CardType::BgNoFrameAwakened => "_1",
         }
     }
@@ -101,8 +104,8 @@ impl CardType {
             CardType::FrameAwakened => "card",
             CardType::FrameNoAwakend => "card",
             CardType::NoFrameAwakened => "card",
-            CardType::NoFrameNoAwakend => "card",
-            CardType::BgNoFrameNoAwakend => "card_bg",
+            CardType::NoFrameNoAwakened => "card",
+            CardType::BgNoFrameNoAwakened => "card_bg",
             CardType::BgNoFrameAwakened => "card_bg",
         }
     }
@@ -114,9 +117,9 @@ impl std::fmt::Display for CardType {
             CardType::FrameAwakened => write!(f, "覚醒後・枠有"),
             CardType::FrameNoAwakend => write!(f, "覚醒前・枠有"),
             CardType::NoFrameAwakened => write!(f, "覚醒後・枠無"),
-            CardType::NoFrameNoAwakend => write!(f, "覚醒前・枠無"),
+            CardType::NoFrameNoAwakened => write!(f, "覚醒前・枠無"),
             CardType::BgNoFrameAwakened => write!(f, "覚醒後"),
-            CardType::BgNoFrameNoAwakend => write!(f, "覚醒前"),
+            CardType::BgNoFrameNoAwakened => write!(f, "覚醒前"),
         }
     }
 }
@@ -151,8 +154,8 @@ mod tests {
     async fn test_fetch_idol_cards_with_opt() {
         let card_option = CardOption {
             idol_id: Some(vec![Idol::MakabeMizuki as i32]),
-            rarity: Some(vec![Rarity::SR]),
-            extra_type: None,
+            rarity: Some(vec![Rarity::SSR]),
+            extra_type: Some(vec![QueryExtraType::Fes]),
         };
         let cards = fetch_idol_cards_with_opt(&card_option).await.unwrap();
         for card in cards {
@@ -161,7 +164,7 @@ mod tests {
                 card.idol_id as i32, &card.resource_id, &card.id, &card.name
             );
             assert_eq!(card.idol_id as i32, 44);
-            assert_eq!(card.rarity, Rarity::SR);
+            assert_eq!(card.rarity, Rarity::SSR);
         }
     }
 
@@ -169,7 +172,7 @@ mod tests {
     async fn test_download_card_image() {
         let card_id = "044miz0254";
         let mut bytes = Vec::new();
-        download_card_image(card_id, &CardType::BgNoFrameNoAwakend, &mut bytes)
+        download_card_image(card_id, &CardType::BgNoFrameNoAwakened, &mut bytes)
             .await
             .unwrap();
         let mut file = std::fs::File::create("test.png").unwrap();
