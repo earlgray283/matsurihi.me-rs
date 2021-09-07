@@ -4,11 +4,6 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use reqwest::{StatusCode, Url};
-use std::{
-    io::Write,
-    path::{self, Path},
-    str::FromStr,
-};
 
 pub struct CardOption<T> {
     pub idol_id: Option<Vec<T>>,
@@ -128,26 +123,23 @@ impl std::fmt::Display for CardType {
 
 pub async fn download_card_image(
     card_id: &str,
-    card_types: &[CardType],
-    name: &Path,
+    card_type: &CardType,
+    buf: &mut Vec<u8>,
 ) -> Result<()> {
     let mut base_url = Url::parse("https://storage.matsurihi.me")?;
-    for card_type in card_types {
-        base_url.set_path(format!("/mltd/{}/", card_type.path_subdir()).as_str());
-        let resource_id = format!("{}{}.png", card_id, card_type.suffix());
-        let url = base_url.join(&resource_id)?;
-        let resp = HTTP_CLIENT.lock().await.get(url).send().await?;
-        if resp.status() != StatusCode::OK {
-            bail!(format!(
-                r#"URL: {}
+    base_url.set_path(format!("/mltd/{}/", card_type.path_subdir()).as_str());
+    let resource_id = format!("{}{}.png", card_id, card_type.suffix());
+    let url = base_url.join(&resource_id)?;
+    let resp = HTTP_CLIENT.lock().await.get(url).send().await?;
+    if resp.status() != StatusCode::OK {
+        bail!(format!(
+            r#"URL: {}
 Response status code was not 200 OK"#,
-                resp.url()
-            ));
-        }
-        let mut file = std::fs::File::create(name)?;
-        let b = resp.bytes().await?;
-        file.write_all(&b)?;
+            resp.url()
+        ));
     }
+    let b = resp.bytes().await?;
+    std::io::copy(&mut b.as_ref(), buf)?;
     Ok(())
 }
 
@@ -176,10 +168,11 @@ mod tests {
     #[tokio::test]
     async fn test_download_card_image() {
         let card_id = "044miz0254";
-        let card_types = &[CardType::BgNoFrameNoAwakend];
-        let name = Path::new("test.png");
-        download_card_image(card_id, card_types, name)
+        let mut bytes = Vec::new();
+        download_card_image(card_id, &CardType::BgNoFrameNoAwakend, &mut bytes)
             .await
             .unwrap();
+        let mut file = std::fs::File::create("test.png").unwrap();
+        std::io::copy(&mut bytes.as_slice(), &mut file).unwrap();
     }
 }
